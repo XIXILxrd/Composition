@@ -1,11 +1,16 @@
 package com.example.composition.presentation
 
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.*
 import com.example.composition.R
 import com.example.composition.data.GameRepositoryImplementation
 import com.example.composition.databinding.FragmentGameBinding
@@ -20,6 +25,23 @@ class GameFragment : Fragment() {
 
     private val repository = GameRepositoryImplementation
 
+    private val viewModel: GameViewModel by lazy {
+        ViewModelProvider(
+            this,
+            ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
+        )[GameViewModel::class.java]
+    }
+
+    private val optionsTextView by lazy {
+        mutableListOf<TextView>().apply {
+            add(binding.tvOption1)
+            add(binding.tvOption2)
+            add(binding.tvOption3)
+            add(binding.tvOption4)
+            add(binding.tvOption5)
+            add(binding.tvOption6)
+        }
+    }
     private lateinit var level: Level
     private lateinit var gameSettings: GameSettings
 
@@ -43,23 +65,76 @@ class GameFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        binding.sumTextView.setOnClickListener {
-            launchGameFinishedFragment(
-                GameResult(
-                    true,
-                    0,
-                    0,
-                    GameSettings(0, 0, 0, 0)
-                )
-            )
-        }
+        observeViewModel()
+        setClickListenersToOptions()
+        viewModel.startGame(level)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
 
         _binding = null
+    }
+
+    private fun setClickListenersToOptions() {
+        for (optionTextView in optionsTextView) {
+            optionTextView.setOnClickListener {
+                viewModel.chooseAnswer(optionTextView.text.toString().toInt())
+            }
+        }
+    }
+
+    private fun observeViewModel() {
+        with(viewModel) {
+            question.observe(viewLifecycleOwner) {
+                binding.sumTextView.text = it.sum.toString()
+                binding.visibleNumberTextView.text = it.visibleNumber.toString()
+
+                for (i in 0 until optionsTextView.size) {
+                    optionsTextView[i].text = it.options[i].toString()
+                }
+            }
+
+            percentOfRightAnswers.observe(viewLifecycleOwner) {
+                binding.progressBar.setProgress(it, true)
+            }
+
+            isEnoughCountOfRightAnswers.observe(viewLifecycleOwner) {
+                binding.tvAnswersProgress.setTextColor(getColorByState(it))
+            }
+
+            isEnoughPercentOfRightAnswers.observe(viewLifecycleOwner) {
+                val color = getColorByState(it)
+
+                binding.progressBar.progressTintList = ColorStateList.valueOf(color)
+            }
+
+            formattedTime.observe(viewLifecycleOwner) {
+                binding.timerTextView.text = it
+            }
+
+            minPercent.observe(viewLifecycleOwner) {
+                binding.progressBar.secondaryProgress = it
+            }
+
+            gameResult.observe(viewLifecycleOwner) {
+                launchGameFinishedFragment(it)
+            }
+
+            progressAnswers.observe(viewLifecycleOwner) {
+                binding.tvAnswersProgress.text = it
+            }
+        }
+    }
+
+    private fun getColorByState(goodState: Boolean): Int {
+        val colorResId = if (goodState) {
+            android.R.color.holo_green_light
+        } else {
+            android.R.color.holo_red_light
+        }
+
+        return ContextCompat.getColor(requireContext(), colorResId)
     }
 
     private fun launchGameFinishedFragment(gameResult: GameResult) {
