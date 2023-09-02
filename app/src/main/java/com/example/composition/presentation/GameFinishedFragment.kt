@@ -1,22 +1,21 @@
 package com.example.composition.presentation
 
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
+import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
+import com.example.composition.R
 import com.example.composition.databinding.FragmentGameFinishedBinding
-import com.example.composition.domain.entity.GameResult
 
 class GameFinishedFragment : Fragment() {
+    private val args by navArgs<GameFinishedFragmentArgs>()
+
     private var _binding: FragmentGameFinishedBinding? = null
     private val binding: FragmentGameFinishedBinding
         get() = _binding ?: throw RuntimeException("FragmentGameBinding == null")
-
-    private lateinit var gameResult: GameResult
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -28,22 +27,13 @@ class GameFinishedFragment : Fragment() {
         return binding.root
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        parseArguments()
-    }
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        bindViews()
+        setupClickListeners()
+    }
 
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    retryGame()
-                }
-            })
-
+    private fun setupClickListeners() {
         binding.buttonRetry.setOnClickListener {
             retryGame()
         }
@@ -55,35 +45,49 @@ class GameFinishedFragment : Fragment() {
         _binding = null
     }
 
-    @Suppress("DEPRECATION")
-    private fun parseArguments() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requireArguments().getParcelable(KEY_GAME_RESULT, GameResult::class.java)?.let {
-                gameResult = it
-            }
+    private fun bindViews() {
+        with(binding) {
+            smileImageView.setImageResource(getSmileResId())
+
+            requiredAnswersTextView.text = String.format(
+                getString(R.string.required_score),
+                args.gameResult.gameSettings.minCountOfRightAnswers
+            )
+
+            scoreAnswersTextView.text = String.format(
+                getString(R.string.score_answers),
+                args.gameResult.countOfRightAnswers
+            )
+
+            requiredPercentageTextView.text = String.format(
+                getString(R.string.required_percentage),
+                args.gameResult.gameSettings.minPercentOfRightAnswers
+            )
+
+            scorePercentageTextView.text = String.format(
+                getString(R.string.score_percentage),
+                getPercentOfRightAnswers()
+            )
+        }
+    }
+
+    private fun getPercentOfRightAnswers(): Int {
+        if (args.gameResult.countOfQuestions == 0) {
+            return 0
+        }
+
+        return ((args.gameResult.countOfRightAnswers / args.gameResult.countOfQuestions.toDouble()) * 100).toInt()
+    }
+
+    private fun getSmileResId(): Int {
+        return if (args.gameResult.isGameWon) {
+            R.drawable.ic_funny_smile
         } else {
-            requireArguments().getParcelable<GameResult>(KEY_GAME_RESULT)?.let {
-                gameResult = it
-            }
+            R.drawable.ic_sad_smile
         }
     }
 
     private fun retryGame() {
-        requireActivity().supportFragmentManager.popBackStack(
-            GameFragment.NAME,
-            FragmentManager.POP_BACK_STACK_INCLUSIVE
-        )
-    }
-
-    companion object {
-        private const val KEY_GAME_RESULT = "game_result"
-
-        fun newInstance(gameResult: GameResult): GameFinishedFragment {
-            return GameFinishedFragment().apply {
-                arguments = Bundle().apply {
-                    putParcelable(KEY_GAME_RESULT, gameResult)
-                }
-            }
-        }
+        findNavController().popBackStack()
     }
 }
